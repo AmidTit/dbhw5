@@ -38,59 +38,102 @@ def create_db(conn):
 #Создаем нового клиента
 def add_client(conn, first_name, last_name, email):
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute("""
                     INSERT INTO Clients (first_name, last_name, email)
                     VALUES
-                        ('{first_name}', '{last_name}', '{email}') 
+                        (%s, %s, %s) 
                         RETURNING id;
-                    """)
+                    """, (first_name, last_name, email))
+        conn.commit()
         print(f"Клиент {first_name} {last_name} был добавлен c идентификатором = {cur.fetchone()[0]}")
         print()
 
 #Добавляем номер телефона для клиента
-# def add_phone(conn, client_id, phone_number):
-#     with conn.cursor() as cur:
-#         cur.execute(f"""
-#                     INSERT INTO Phone_numbers (client_id, phone_number)
-#                     VALUES
-#                         ({client_id}, '{phone_number}') 
-#                         RETURNING id;
-#                     """)
-#         print(f"Phone number was added with id = {cur.fetchone()[0]}")
+def add_phone(conn, client_id, phone_number):
+    with conn.cursor() as cur:
+        cur.execute("""
+                    SELECT id FROM Clients
+                    WHERE id = %s
+                    """, (client_id, ))
+        
+        if cur.fetchone() == None:
+            print("Id не найден, повторите попытку еще раз")                           
+        else:
+            cur.execute("""
+                        INSERT INTO Phone_numbers (client_id, phone_number)
+                        VALUES
+                            (%s, %s) 
+                            RETURNING id;
+                        """, (client_id, phone_number))
+            conn.commit()
+            print(f"Номер телефона был добавлен с id = {cur.fetchone()[0]}")
+               
+#Изменяем данные о клиенте
+def change_client(conn, client_id, first_name, last_name, email, phone_number):
+    with conn.cursor() as cur:
+        
+        cur.execute(f"""
+                    UPDATE Clients
+                    SET first_name = '{first_name}'
+                    WHERE id = {client_id};
+                    """)
+        
+        cur.execute(f"""
+                    UPDATE Clients
+                    SET last_name = '{last_name}'
+                    WHERE id = {client_id};
+                    """)
+        
+        cur.execute(f"""
+                    UPDATE Clients
+                    SET email = '{email}'
+                    WHERE id = {client_id};
+                    """)
 
-# def change_client(conn, client_id, first_name=None, last_name=None, email=None, phones=None):
-#     with conn.cursor() as cur:
-#         print("Введите новые данные о клиенте: ")
-#         cur.execute("""
-#                     UPDATE Clients
-#                     SET first_name = '{first_name}'
-#                     WHERE id = {id};
+        cur.execute(f"""
+                    UPDATE Phone_numbers
+                    SET phone_number = '{phone_number}'
+                    WHERE client_id = {client_id};
+                    """)
+        conn.commit()
+        print("Данные были успешно обновлены!!!")
 
-#                     UPDATE Clients
-#                     SET last_name = '{last_name}'
-#                     WHERE id = {id};
+#Удаляем телефонные номера по client_id
+def delete_phone(conn, id):
+    with conn.cursor() as cur:
+        cur.execute(f"""
+                        SELECT phone_number FROM Phone_numbers
+                        WHERE id = {id}
+                    """) 
+        
+        cur.execute(f"""
+                    DELETE FROM Phone_numbers
+                    WHERE id = {id} 
+                    """)
+        print("Номер был успешно удален!!!")
+        conn.commit()
 
-#                     UPDATE Clients
-#                     SET email = '{email}'
-#                     WHERE id = {id};
-
-#                     UPDATE Phone_numbers
-#                     SET phone_number = '{phone_number}'
-#                     WHERE client_id = '{client_id}';
-#                     """)
-
-# def delete_phone(conn, client_id, phone):
-#     pass
-
-# def delete_client(conn, client_id):
-#     pass
-
+#Удаляем существующего клиента         
+def delete_client(conn, client_id):
+    with conn.cursor() as cur:
+        cur.execute(f"""
+                    DELETE FROM Phone_numbers
+                    WHERE client_id = {client_id} 
+                    """)
+        cur.execute(f"""
+                    DELETE FROM Clients
+                    WHERE id = {client_id} 
+                    """)
+        print("Клиент был успешно удален!!!")
+        conn.commit()
+        
 # def find_client(conn, first_name=None, last_name=None, email=None, phone=None):
 #     pass
 
 
 #Функция для вызова необходимых функций
 def choose_function(conn):
+
     print("""Введите номер функции для выполнения: 
             1) Функция, создающая структуру БД (таблицы).
             2) Функция, удаляющая структуру БД (таблицы).
@@ -101,8 +144,10 @@ def choose_function(conn):
             7) Функция, позволяющая удалить существующего клиента.
             8) Функция, позволяющая найти клиента по его данным: имени, фамилии, email или телефону.
             0) Выход из меню выбора.""")
+    
     num = input()
     print()
+
     if num in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
         if num == "0":
             exit()
@@ -117,12 +162,46 @@ def choose_function(conn):
 
         elif num == "3":
 
-            first_name = input("Введите email клиента: ")
+            first_name = input("Введите имя клиента: ")
             last_name = input("Введите фамилию клиента: ")
-            email = input("Введите имя клиента: ")
+            email = input("Введите email клиента: ")
 
-            add_client(conn, first_name, last_name, email)  
+            add_client(conn, first_name, last_name, email) 
             choose_function(conn)  
+
+        elif num == "4":
+
+            client_id, phone_number = int(input("Введите id клиента: ")), input("Введите номер телефона клиента: ")
+            
+            add_phone(conn, client_id, phone_number)
+            print()
+            choose_function(conn)
+
+        elif num == "5":
+            print("Введите новые данные о клиенте: ")
+            print()
+            client_id = int(input("Введите id клиента, данные о которм вы хотите изменить: ")) 
+            first_name, last_name = input("Введите имя клиента: "), input("Вdедите фамилию клиента: ")
+            email, phone_number = input("Введите email клиента: "), input("Введите номер телефона клиента: ")
+            change_client(conn, client_id, first_name, last_name, email, phone_number)
+            print()          
+            choose_function(conn)
+
+        elif num == "6":
+            id = input("Введите id номера телефона для удаления: ")
+            delete_phone(conn, id)
+            print()          
+            choose_function(conn)
+
+        elif num == "7":
+            client_id = input("Введите id Клиента для удаления: ")
+            delete_client(conn, client_id)
+            print()          
+            choose_function(conn) 
+
+        elif num == "8":
+            pass    
+
     else:
         print("Такой функции не существует, попробуй еще раз)")      
         print()          
