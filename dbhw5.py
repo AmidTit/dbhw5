@@ -45,6 +45,7 @@ def add_client(conn, first_name, last_name, email):
                         RETURNING id;
                     """, (first_name, last_name, email))
         conn.commit()
+        print()
         print(f"Клиент {first_name} {last_name} был добавлен c идентификатором = {cur.fetchone()[0]}")
         print()
 
@@ -72,63 +73,87 @@ def add_phone(conn, client_id, phone_number):
 def change_client(conn, client_id, first_name, last_name, email, phone_number):
     with conn.cursor() as cur:
         
-        cur.execute(f"""
+        cur.execute("""
                     UPDATE Clients
-                    SET first_name = '{first_name}'
-                    WHERE id = {client_id};
-                    """)
+                    SET first_name = %s
+                    WHERE id = %s;
+                    """, (first_name, client_id))
         
-        cur.execute(f"""
+        cur.execute("""
                     UPDATE Clients
-                    SET last_name = '{last_name}'
-                    WHERE id = {client_id};
-                    """)
+                    SET last_name = %s
+                    WHERE id = %s;
+                    """, (last_name, client_id))
         
-        cur.execute(f"""
+        cur.execute("""
                     UPDATE Clients
-                    SET email = '{email}'
-                    WHERE id = {client_id};
-                    """)
+                    SET email = %s
+                    WHERE id = %s;
+                    """, (email, client_id))
 
-        cur.execute(f"""
+        cur.execute("""
                     UPDATE Phone_numbers
-                    SET phone_number = '{phone_number}'
-                    WHERE client_id = {client_id};
-                    """)
+                    SET phone_number = %s
+                    WHERE client_id = %s;
+                    """, (phone_number, client_id))
         conn.commit()
         print("Данные были успешно обновлены!!!")
 
 #Удаляем телефонные номера по client_id
 def delete_phone(conn, id):
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute("""
                         SELECT phone_number FROM Phone_numbers
-                        WHERE id = {id}
-                    """) 
+                        WHERE id = %s
+                    """, (id, ))
         
-        cur.execute(f"""
+        cur.execute("""
                     DELETE FROM Phone_numbers
-                    WHERE id = {id} 
-                    """)
+                    WHERE id = %s
+                    """, (id, ))
         print("Номер был успешно удален!!!")
         conn.commit()
 
 #Удаляем существующего клиента         
 def delete_client(conn, client_id):
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute("""
                     DELETE FROM Phone_numbers
-                    WHERE client_id = {client_id} 
-                    """)
-        cur.execute(f"""
+                    WHERE client_id = %s 
+                    """, (client_id, ))
+        cur.execute("""
                     DELETE FROM Clients
-                    WHERE id = {client_id} 
-                    """)
+                    WHERE id = %s
+                    """, (client_id, ))
         print("Клиент был успешно удален!!!")
         conn.commit()
-        
-# def find_client(conn, first_name=None, last_name=None, email=None, phone=None):
-#     pass
+
+#Поиск клиента        
+def find_client(conn, info, first_name=None, last_name=None, email=None, phone_number=None):
+    if info == 1:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id FROM Clients WHERE first_name = %s AND last_name = %s AND email=%s;
+                        """, (first_name, last_name, email))
+            
+            if cur.rowcount > 0:
+                print(f"клиент с id = {cur.fetchone()[0]} был успешно найден")
+                conn.commit()
+                
+            else:    
+                print("Клиент не найден")
+    else:
+        with conn.cursor() as cur:
+            cur.execute("""
+            SELECT client_id FROM Phone_numbers WHERE phone_number = %s;
+            """, (phone_number, ))
+
+            if cur.rowcount > 0:
+                print(f"клиент с id = {cur.fetchone()[0]} был успешно найден")
+                conn.commit()
+                
+            else:    
+                print("Клиент не найден")
+            
 
 
 #Функция для вызова необходимых функций
@@ -181,8 +206,8 @@ def choose_function(conn):
             print("Введите новые данные о клиенте: ")
             print()
             client_id = int(input("Введите id клиента, данные о которм вы хотите изменить: ")) 
-            first_name, last_name = input("Введите имя клиента: "), input("Вdедите фамилию клиента: ")
-            email, phone_number = input("Введите email клиента: "), input("Введите номер телефона клиента: ")
+            first_name, last_name = input("Введите новое имя клиента: "), input("Введите новую фамилию клиента: ")
+            email, phone_number = input("Введите новый  email клиента: "), input("Введите новый номер телефона клиента: ")
             change_client(conn, client_id, first_name, last_name, email, phone_number)
             print()          
             choose_function(conn)
@@ -200,16 +225,38 @@ def choose_function(conn):
             choose_function(conn) 
 
         elif num == "8":
-            pass    
+            print()
+            info = int(input('''
+                        По каким данным вы хотите осуществить поиск клиента?
+                        1) По ФИО и email
+                        2) По номеру телефона
+                        '''))
+            
+            if info == 1:
+
+                first_name = input('Введите имя для поиска: ')
+                last_name = input('Введите фамилию для поиска: ')
+                email = input('Введите email для поиска: ')
+                find_client(conn, info, first_name, last_name, email)
+                print()          
+                choose_function(conn) 
+
+            elif info == 2:
+                phone_number = input('Введите телефон для поиска: ')
+                find_client(conn, info, phone_number) 
+                print()          
+                choose_function(conn)   
+
 
     else:
         print("Такой функции не существует, попробуй еще раз)")      
         print()          
         choose_function(conn)
 
+if __name__ == "__main__":
 
-with psycopg2.connect(database=db, user=user, password=password) as conn:
-   choose_function(conn)
+    with psycopg2.connect(database=db, user=user, password=password) as conn:
+        choose_function(conn)
    
 conn.close()
 
